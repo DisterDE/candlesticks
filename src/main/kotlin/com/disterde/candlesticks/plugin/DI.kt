@@ -1,7 +1,7 @@
 package com.disterde.candlesticks.plugin
 
-import com.disterde.candlesticks.service.HandlerOrchestrator
-import com.disterde.candlesticks.service.HandlerOrchestratorImpl
+import com.disterde.candlesticks.service.HandlerManager
+import com.disterde.candlesticks.service.HandlerManagerImpl
 import com.disterde.candlesticks.service.MessageListener
 import com.disterde.candlesticks.service.MessageListenerImpl
 import io.ktor.client.*
@@ -17,13 +17,11 @@ fun Application.configureKoin() {
     install(Koin) {
         slf4jLogger()
         modules(module {
-            single<HandlerOrchestrator> { HandlerOrchestratorImpl() }
+            single<HandlerManager> { HandlerManagerImpl() }
             single<HttpClient> {
                 HttpClient {
                     install(WebSockets) {
-                        contentConverter = KotlinxWebsocketSerializationConverter(Json {
-                            ignoreUnknownKeys = true
-                        })
+                        contentConverter = KotlinxWebsocketSerializationConverter(Json { ignoreUnknownKeys = true })
                     }
                 }
             }

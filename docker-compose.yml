@@ -6,4 +6,4 @@ services:
       - ./:/app
     command: bash -c "cd /app && java -jar partner-service-1.0.1-all.jar --port=8032"
     ports:
-      - 8032:8032
+      - "8032:8032"

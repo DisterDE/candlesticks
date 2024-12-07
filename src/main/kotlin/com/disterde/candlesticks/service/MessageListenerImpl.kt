@@ -1,5 +1,6 @@
 package com.disterde.candlesticks.service
 
+import com.disterde.candlesticks.model.TimedPrice
 import com.disterde.candlesticks.model.event.InstrumentEvent
 import com.disterde.candlesticks.model.event.InstrumentEvent.Type.ADD
 import com.disterde.candlesticks.model.event.InstrumentEvent.Type.DELETE
@@ -10,10 +11,11 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import java.time.Instant
 
 class MessageListenerImpl(
     private val client: HttpClient,
-    private val orchestrator: HandlerOrchestrator
+    private val manager: HandlerManager
 ) : MessageListener {
 
     private val scope = CoroutineScope(Dispatchers.Default)
@@ -26,7 +28,10 @@ class MessageListenerImpl(
                     client.webSocket(host = HOST, port = PORT, path = QUOTES) {
                         while (active) {
                             val quote = receiveDeserialized<QuoteEvent>().data
-                            scope.launch { orchestrator.getHandler(quote.isin)?.addPrice(quote.price) }
+                            val timestamp = Instant.now()
+                            scope.launch {
+                                manager.getHandler(quote.isin)?.addPrice(TimedPrice(quote.price, timestamp))
+                            }
                         }
                     }
                 } catch (e: Exception) {
@@ -44,8 +49,8 @@ class MessageListenerImpl(
                             val (type, data) = receiveDeserialized<InstrumentEvent>()
                             scope.launch {
                                 when (type) {
-                                    ADD -> orchestrator.createHandler(data.isin)
-                                    DELETE -> orchestrator.deleteHandler(data.isin)
+                                    ADD -> manager.createHandler(data.isin)
+                                    DELETE -> manager.deleteHandler(data.isin)
                                 }
                             }
                         }
