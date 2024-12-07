@@ -1,0 +1,6 @@
+ktor:
+  application:
+    modules:
+      - com.disterde.ApplicationKt.module
+  deployment:
+    port: 9000

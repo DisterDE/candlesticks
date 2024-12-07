@@ -1,0 +1,9 @@
+version: "2.4"
+services:
+  java:
+    image: openjdk:17
+    volumes:
+      - ./:/app
+    command: bash -c "cd /app && java -jar partner-service-1.0.1-all.jar --port=8032"
+    ports:
+      - 8032:8032
