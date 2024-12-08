@@ -30,7 +30,7 @@ interface HandlerManager {
      * @param isin The ISIN (International Securities Identification Number) of the instrument.
      * @return The `CandlestickHandler` for the specified ISIN, or `null` if not found.
      */
-    fun getHandler(isin: ISIN): CandlestickHandler?
+    fun getHandler(isin: ISIN): CandlestickHandler
 
     /**
      * Creates a new candlestick handler for a specific ISIN.
