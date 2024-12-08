@@ -4,6 +4,7 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.versions)
     alias(libs.plugins.versions.catalog)
+    id("jacoco")
 }
 
 group = "com.disterde.candlesticks"
@@ -51,6 +52,38 @@ dependencies {
     testImplementation(libs.ktor.client.mock)
     testImplementation(libs.kotlin.test.junit)
     testImplementation(libs.ktor.server.test.host)
+}
+
+kotlin {
+    jvmToolchain(21)
+}
+
+jacoco {
+    toolVersion = "0.8.12"
+}
+
+tasks.jacocoTestCoverageVerification {
+    violationRules {
+        rule {
+            limit {
+                minimum = 0.99.toBigDecimal()
+            }
+        }
+    }
+
+    classDirectories.setFrom(
+        files(
+            classDirectories.files.map {
+                fileTree(it) {
+                    exclude("**/model/**")
+                    exclude("**/plugin/**")
+                    exclude("**/exception/**")
+                    exclude("**/util/**")
+                    exclude("**/Application*")
+                }
+            }
+        )
+    )
 }
 
 tasks.dependencyUpdates {
