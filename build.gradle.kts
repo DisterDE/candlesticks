@@ -64,6 +64,23 @@ jacoco {
 
 tasks.test {
     useJUnitPlatform()
+    finalizedBy(tasks.jacocoTestReport)
+}
+
+tasks.jacocoTestReport {
+    classDirectories.setFrom(
+        files(
+            classDirectories.files.map {
+                fileTree(it) {
+                    exclude("**/model/**")
+                    exclude("**/plugin/**")
+                    exclude("**/exception/**")
+                    exclude("**/util/**")
+                    exclude("**/Application*")
+                }
+            }
+        )
+    )
 }
 
 tasks.jacocoTestCoverageVerification {

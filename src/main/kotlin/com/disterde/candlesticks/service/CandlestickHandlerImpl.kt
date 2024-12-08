@@ -239,13 +239,27 @@ class CandlestickHandlerImpl(
     }
 
     /**
-     * Processes a new price update by sending it to the event channel.
-     * This function is asynchronous to support processing in a coroutine context.
+     * Asynchronously processes a new price update by sending it to the event channel.
      *
-     * @param price The `TimedPrice` object containing the new price update
-     * and its associated timestamp.
+     * This method ensures that the price update is added to the event channel for sequential
+     * processing. It validates the input price and logs any skipped values, such as negative prices.
+     *
+     * ### Key Behavior:
+     * - If the price is valid, it is enqueued into the `eventChannel` for further processing.
+     * - If the price is invalid (e.g., negative), it is skipped and logged for traceability.
+     *
+     * ### Thread Safety:
+     * This method is thread-safe as it utilizes a channel to serialize updates, ensuring
+     * that concurrent calls do not lead to race conditions or inconsistent state.
+     *
+     * @param price The `TimedPrice` object containing the new price data and its associated timestamp.
+     * @throws CancellationException if the coroutine scope is cancelled before the price can be sent.
      */
     override suspend fun addPrice(price: TimedPrice) {
+        if (price.price < 0) {
+            log.debug { "[$isin] Skipped price update: price cannot be negative. Received: $price" }
+            return
+        }
         eventChannel.send(NewPrice(price))
         log.trace { "[$isin] Added price to event channel: $price" }
     }
