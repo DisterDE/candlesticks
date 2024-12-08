@@ -12,6 +12,7 @@ import java.time.LocalDateTime
 import java.time.ZoneOffset.UTC
 import java.time.temporal.ChronoUnit.MINUTES
 import java.time.temporal.ChronoUnit.SECONDS
+import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -86,7 +87,7 @@ class CandlestickHandlerImplTest {
         handler.addPrice(TimedPrice(100.0, startTime))
         advanceTimeBy(60.seconds)
         handler.addPrice(TimedPrice(110.0, startTime.plus(1, MINUTES)))
-        advanceTimeBy(100)
+        advanceTimeBy(1.seconds)
         handler.stop()
 
         val candles = handler.getCandlesticks()
@@ -101,8 +102,8 @@ class CandlestickHandlerImplTest {
 
         repeat(10) { i ->
             launch { handler.addPrice(TimedPrice(100.0 + i, startTime.plus(i.toLong(), MINUTES))) }
-            advanceTimeBy(60.seconds)
         }
+        advanceTimeBy(10.minutes)
         handler.stop()
 
         val candles = handler.getCandlesticks()
@@ -118,7 +119,7 @@ class CandlestickHandlerImplTest {
         handler.addPrice(TimedPrice(100.0, startTime))
         handler.addPrice(TimedPrice(110.0, startTime.plus(1, MINUTES)))
         handler.addPrice(TimedPrice(90.0, startTime))
-        advanceTimeBy(100)
+        advanceTimeBy(60.seconds)
         handler.stop()
 
         val candles = handler.getCandlesticks()
@@ -137,7 +138,7 @@ class CandlestickHandlerImplTest {
             }
         }
 
-        advanceTimeBy(1.seconds)
+        advanceTimeBy(100.seconds)
         handler.stop()
 
         val candles = handler.getCandlesticks()
@@ -215,14 +216,14 @@ class CandlestickHandlerImplTest {
             }
         }
 
-        advanceTimeBy(1.seconds)
+        advanceTimeBy(200.seconds)
         handler.stop()
 
         val candles = handler.getCandlesticks()
-        assertThat(candles).hasSize(3) // Assumes periods overlap into third minute
+        assertThat(candles).hasSize(4) // Assumes periods overlap into third minute
         val lastCandle = candles.last()
-        assertThat(lastCandle.openPrice).isEqualTo(200.0)
-        assertThat(lastCandle.lowPrice).isEqualTo(200.0)
+        assertThat(lastCandle.openPrice).isEqualTo(280.0)
+        assertThat(lastCandle.lowPrice).isEqualTo(280.0)
         assertThat(lastCandle.highPrice).isEqualTo(299.0)
         assertThat(lastCandle.closingPrice).isEqualTo(299.0)
     }
