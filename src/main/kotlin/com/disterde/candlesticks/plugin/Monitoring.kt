@@ -1,11 +1,10 @@
 package com.disterde.candlesticks.plugin
 
 import io.ktor.server.application.*
+import io.ktor.server.plugins.*
 import io.ktor.server.plugins.calllogging.*
 import io.ktor.server.request.*
 import org.slf4j.event.Level
-import io.github.oshai.kotlinlogging.KotlinLogging
-import io.ktor.server.plugins.*
 
 /**
  * Configures logging for incoming HTTP calls.

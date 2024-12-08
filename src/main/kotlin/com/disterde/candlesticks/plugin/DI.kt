@@ -12,7 +12,6 @@ import kotlinx.serialization.json.Json
 import org.koin.dsl.module
 import org.koin.ktor.plugin.Koin
 import org.koin.logger.slf4jLogger
-import io.github.oshai.kotlinlogging.KotlinLogging
 
 /**
  * Configures the Koin dependency injection framework for the application.

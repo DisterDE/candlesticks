@@ -1,16 +1,14 @@
 package com.disterde.candlesticks.plugin
 
-import com.disterde.candlesticks.exception.ApiException
 import com.disterde.candlesticks.exception.HandlerNotFoundException
 import com.disterde.candlesticks.service.HandlerManager
-import io.ktor.http.HttpStatusCode
-import io.ktor.server.application.*
-import io.ktor.server.response.*
-import io.ktor.server.routing.*
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.http.HttpStatusCode.Companion.BadRequest
 import io.ktor.http.HttpStatusCode.Companion.InternalServerError
 import io.ktor.http.HttpStatusCode.Companion.NotFound
+import io.ktor.server.application.*
+import io.ktor.server.response.*
+import io.ktor.server.routing.*
 import org.koin.ktor.ext.inject
 
 /**
