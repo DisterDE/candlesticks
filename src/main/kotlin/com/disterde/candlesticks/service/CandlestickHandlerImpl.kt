@@ -96,7 +96,11 @@ class CandlestickHandlerImpl(
     }
 
     /**
-     * Processes incoming events.
+     * Handles incoming price events by executing the corresponding logic
+     * based on the type of the price message.
+     *
+     * @param event The price message event, which can be either a new price update
+     * or a candle closure. The event determines the specific handling logic to be executed.
      */
     private fun handleEvent(event: PriceMessage) {
         when (event) {
@@ -157,7 +161,13 @@ class CandlestickHandlerImpl(
     }
 
     /**
-     * Handles a new incoming price by updating the current or closed candles.
+     * Handles a new price update by adjusting the current candlestick or creating a new one.
+     *
+     * This function is triggered each time a new `TimedPrice` is received. It updates the current
+     * candlestick according to the price and timestamp provided, closing the current candlestick
+     * and opening a new one as necessary.
+     *
+     * @param timedPrice The `TimedPrice` object containing the new price data and its associated timestamp.
      */
     private fun handleNewPrice(timedPrice: TimedPrice) {
         val (price, timestamp) = timedPrice
@@ -192,7 +202,12 @@ class CandlestickHandlerImpl(
     }
 
     /**
-     * Updates a closed candle if the price corresponds to an already closed minute.
+     * Updates the information of closed candlesticks with a new price if a matching
+     * timestamp is found in the list of closed candlesticks.
+     *
+     * @param price The new price used to update the closed candlestick.
+     * @param priceMinuteStart The starting timestamp of the minute for which the candlestick
+     * should be updated.
      */
     private fun updateClosedCandles(price: Price, priceMinuteStart: Instant) {
         val closedCandles = state.closedCandles
@@ -210,7 +225,11 @@ class CandlestickHandlerImpl(
     }
 
     /**
-     * Adds a new price to the handler.
+     * Processes a new price update by sending it to the event channel.
+     * This function is asynchronous to support processing in a coroutine context.
+     *
+     * @param price The `TimedPrice` object containing the new price update
+     * and its associated timestamp.
      */
     override suspend fun addPrice(price: TimedPrice) {
         eventChannel.send(NewPrice(price))
@@ -218,9 +237,12 @@ class CandlestickHandlerImpl(
     }
 
     /**
-     * Returns the list of candlesticks, including the current one if it exists.
+     * Retrieves a list of candlesticks, optionally including the current candlestick
+     * if it is still open.
+     * The number of returned candlesticks is limited to `maxCandles`.
      *
-     * Copies are returned to prevent external consumers from mutating internal state.
+     * @return A list of `Candlestick` objects representing the most recent candlesticks,
+     * including the current candlestick if applicable, each as a new copy.
      */
     override fun getCandlesticks(): List<Candlestick> {
         val (closedCandles, currentCandle) = state
@@ -231,7 +253,13 @@ class CandlestickHandlerImpl(
     }
 
     /**
-     * Stops the handler and cleans up resources.
+     * Stops the handler and releases allocated resources.
+     *
+     * This method is responsible for cancelling the coroutine scope and closing the event channel
+     * associated with the handler.
+     * This function ensures that all ongoing operations are halted safely and no further events
+     * can be processed, which is essential for properly shutting down the handler when it is
+     * no longer necessary.
      */
     override fun stop() {
         scope.cancel()
@@ -240,7 +268,14 @@ class CandlestickHandlerImpl(
     }
 
     /**
-     * Sends a command to close the current candle.
+     * Closes the current candlestick at the specified timestamp.
+     *
+     * This function signals the closure of the current candlestick by sending a close event
+     * to the event channel and logs the action.
+     * Subsequent handling of this event will ensure
+     * the proper finalization and transition of the candlestick.
+     *
+     * @param closeTimestamp The timestamp at which the candlestick should be closed.
      */
     private suspend fun closeCurrentCandle(closeTimestamp: Instant) {
         eventChannel.send(CloseCandle(closeTimestamp))
@@ -248,7 +283,11 @@ class CandlestickHandlerImpl(
     }
 
     /**
-     * Creates a new candlestick.
+     * Creates a new candlestick with the specified open and close timestamps and price.
+     *
+     * @param openT The timestamp marking the start of the candlestick interval.
+     * @param closeT The timestamp marking the end of the candlestick interval.
+     * @param price The price used to initialize the candlestick's open, close, high, and low prices.
      */
     private fun createCandle(
         openT: Instant,
