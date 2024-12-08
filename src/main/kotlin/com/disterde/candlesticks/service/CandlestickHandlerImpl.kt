@@ -193,6 +193,32 @@ class CandlestickHandlerImpl(
      * Updates the information of closed candlesticks with a new price if a matching
      * timestamp is found in the list of closed candlesticks.
      *
+     * ### Behavior:
+     * - Finds a closed candlestick by its `openTimestamp` and updates its values:
+     *   - `closingPrice` is updated to the new price.
+     *   - `highPrice` and `lowPrice` are adjusted based on the new price.
+     * - If no matching candlestick is found, logs a warning and ignores the price.
+     *
+     * ### Assumptions:
+     * - The `priceMinuteStart` timestamp is determined when the price is received by the application.
+     * - Delays in processing may cause prices to arrive in the processing pipeline
+     *   after the following candlesticks have already been created. In such cases:
+     *   - The timestamp of the price reflects the actual time it should belong to.
+     *   - The price is treated as part of its appropriate interval and is used to update
+     *     the corresponding closed candlestick, even if the price arrives late in the pipeline.
+     *
+     * ### Handling Delays:
+     * - Delays in processing are considered to be application-level issues, typically caused
+     *   by suspended threads or resource contention.
+     * - Such delayed prices are logged and applied to their respective candlesticks, ensuring
+     *   the integrity of the data.
+     *
+     * ### Example:
+     * - A price is received at `10:01:45` but is delayed due to a system load.
+     * - By the time it reaches the channel, the system has already created the `10:01` candlestick
+     *   and started processing the `10:02` candlestick.
+     * - The delayed price will still update the `10:01` candlestick, as its timestamp places it in that interval.
+     *
      * @param price The new price used to update the closed candlestick.
      * @param priceMinuteStart The starting timestamp of the minute for which the candlestick
      * should be updated.
