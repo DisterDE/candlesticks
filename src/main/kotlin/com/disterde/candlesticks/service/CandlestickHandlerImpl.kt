@@ -113,15 +113,37 @@ class CandlestickHandlerImpl(
     }
 
     /**
-     * Handles the closure of the current candle and moves it to the list of closed candles.
+     * Closes the current candle or creates a new one if no data was received.
+     *
+     * ### Behavior:
+     * - **No current candle:** Creates a new candle using the last closed candle:
+     *   - `openPrice` and `closingPrice` are set to the last `closingPrice`.
+     *   - `highPrice` and `lowPrice` preserve the last candle's range.
+     * - **Current candle exists:** Finalizes and moves it to the closed list.
+     *
+     * ### Example:
+     * - **Last closed candle:**
+     *   ```
+     *   { open: 100.0, high: 105.0, low: 98.0, close: 102.0 }
+     *   ```
+     * - **New candle (no data):**
+     *   ```
+     *   { open: 102.0, high: 105.0, low: 98.0, close: 102.0 }
+     *   ```
+     *
+     * @param closeTimestamp The timestamp for the candle's closure.
      */
     private fun handleCloseCandle(closeTimestamp: Instant) {
         val (closedCandles, currentCandle) = state
         if (currentCandle == null) {
-            closedCandles.lastOrNull()?.let {
-                val newCandle = it.copy(
-                    openTimestamp = it.closeTimestamp,
+            closedCandles.lastOrNull()?.let { lastCandle ->
+                val newCandle = Candlestick(
+                    openTimestamp = lastCandle.closeTimestamp,
                     closeTimestamp = closeTimestamp,
+                    openPrice = lastCandle.closingPrice,
+                    highPrice = lastCandle.highPrice,
+                    lowPrice = lastCandle.lowPrice,
+                    closingPrice = lastCandle.closingPrice
                 )
                 closedCandles += newCandle
                 while (closedCandles.size > maxCandles) closedCandles.removeFirst()
