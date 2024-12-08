@@ -65,7 +65,7 @@ class CandlestickHandlerImpl(
     private val eventChannel = Channel<PriceMessage>(
         capacity = BUFFERED,
         onUndeliveredElement = {
-            log.warn { "Unprocessed element dropped in the $isin handler: $it" }
+            log.warn { "[$isin] Unprocessed element dropped: $it" }
         }
     )
 
@@ -101,12 +101,12 @@ class CandlestickHandlerImpl(
     private fun handleEvent(event: PriceMessage) {
         when (event) {
             is NewPrice -> {
-                log.trace { "Processing new price event: $event" }
+                log.trace { "[$isin] Processing new price event: $event" }
                 handleNewPrice(event.price)
             }
 
             is CloseCandle -> {
-                log.trace { "Processing close candle event: $event" }
+                log.trace { "[$isin] Processing close candle event: $event" }
                 handleCloseCandle(event.closeTimestamp)
             }
         }
@@ -131,7 +131,7 @@ class CandlestickHandlerImpl(
             while (closedCandles.size > maxCandles) closedCandles.removeFirst()
             state.currentCandle = null
         }
-        log.info { "Closed candle at $closeTimestamp" }
+        log.debug { "[$isin] Closed candle at $closeTimestamp" }
     }
 
     /**
@@ -150,7 +150,7 @@ class CandlestickHandlerImpl(
                         highPrice = maxOf(highPrice, price)
                         lowPrice = minOf(lowPrice, price)
                     }
-                    log.debug { "Updated current candle with price: $price at $timestamp" }
+                    log.trace { "[$isin] Updated current candle with price: $price at $timestamp" }
                 }
 
                 current.closeTimestamp -> {
@@ -158,14 +158,14 @@ class CandlestickHandlerImpl(
                     state.closedCandles += current
                     while (state.closedCandles.size > maxCandles) state.closedCandles.removeFirst()
                     state.currentCandle = newCandle
-                    log.info { "Closed current candle and created new one for $priceMinuteStart" }
+                    log.debug { "[$isin] Closed current candle and created new one for $priceMinuteStart" }
                 }
 
                 else -> updateClosedCandles(price, priceMinuteStart)
             }
         } ?: run {
             state.currentCandle = createCandle(priceMinuteStart, nextMinuteStart, price)
-            log.info { "Created new candle for $priceMinuteStart with price: $price" }
+            log.debug { "[$isin] Created new candle for $priceMinuteStart with price: $price" }
         }
     }
 
@@ -181,9 +181,9 @@ class CandlestickHandlerImpl(
                 highPrice = maxOf(highPrice, price)
                 lowPrice = minOf(lowPrice, price)
             }
-            log.debug { "Updated closed candle for $priceMinuteStart with price: $price" }
+            log.debug { "[$isin] Updated closed candle for $priceMinuteStart with price: $price" }
         } else {
-            log.warn { "Price received for unknown candle: $priceMinuteStart" }
+            log.warn { "[$isin] Price received for unknown candle: $priceMinuteStart" }
         }
     }
 
@@ -192,7 +192,7 @@ class CandlestickHandlerImpl(
      */
     override suspend fun addPrice(price: TimedPrice) {
         eventChannel.send(NewPrice(price))
-        log.trace { "Added price to event channel: $price" }
+        log.trace { "[$isin] Added price to event channel: $price" }
     }
 
     /**
@@ -205,7 +205,7 @@ class CandlestickHandlerImpl(
         return (currentCandle?.let { closedCandles + it } ?: closedCandles)
             .takeLast(maxCandles)
             .map { it.copy() }
-            .also { log.trace { "Returning candlesticks: $it" } }
+            .also { log.trace { "[$isin] Returning candlesticks: $it" } }
     }
 
     /**
@@ -214,7 +214,7 @@ class CandlestickHandlerImpl(
     override fun stop() {
         scope.cancel()
         eventChannel.close()
-        log.info { "Stopped handler for ISIN: $isin" }
+        log.info { "[$isin] Stopped handler" }
     }
 
     /**
@@ -222,7 +222,7 @@ class CandlestickHandlerImpl(
      */
     private suspend fun closeCurrentCandle(closeTimestamp: Instant) {
         eventChannel.send(CloseCandle(closeTimestamp))
-        log.trace { "Sent close candle event for timestamp: $closeTimestamp" }
+        log.trace { "[$isin] Sent close candle event for timestamp: $closeTimestamp" }
     }
 
     /**
@@ -240,6 +240,6 @@ class CandlestickHandlerImpl(
         highPrice = price,
         lowPrice = price
     ).also {
-        log.trace { "New candle created: $it" }
+        log.trace { "[$isin] New candle created: $it" }
     }
 }
