@@ -13,7 +13,7 @@ import java.time.Duration
 import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneOffset
-import java.time.temporal.ChronoUnit
+import java.time.temporal.ChronoUnit.MINUTES
 
 /**
  * Implementation of a candlestick handler for a specific ISIN.
@@ -53,10 +53,11 @@ import java.time.temporal.ChronoUnit
 class CandlestickHandlerImpl(
     private val isin: ISIN,
     private val maxCandles: Int,
+    dispatcher: CoroutineDispatcher = Dispatchers.Default
 ) : CandlestickHandler {
 
     private val log = KotlinLogging.logger {}
-    private val scope = CoroutineScope(Dispatchers.Default)
+    private val scope = CoroutineScope(dispatcher)
 
     // Mutable state for storing candlesticks
     private val state = CandleState()
@@ -117,38 +118,25 @@ class CandlestickHandlerImpl(
     }
 
     /**
-     * Closes the current candle or creates a new one if no data was received.
+     * Closes the current candlestick or generates a new one based on the last closed candlestick.
      *
      * ### Behavior:
-     * - **No current candle:** Creates a new candle using the last closed candle:
-     *   - `openPrice` and `closingPrice` are set to the last `closingPrice`.
-     *   - `highPrice` and `lowPrice` preserve the last candle's range.
-     * - **Current candle exists:** Finalizes and moves it to the closed list.
+     * - **No current candlestick (`currentCandle` is null):**
+     *   - A new candlestick is created using the `createFromLast` extension function on the list of closed candlesticks.
+     *   - This ensures continuity of data even if no new prices were received during the interval.
+     * - **Existing current candlestick:**
+     *   - Finalizes the candlestick and moves it to the closed list.
      *
      * ### Example:
-     * - **Last closed candle:**
-     *   ```
-     *   { open: 100.0, high: 105.0, low: 98.0, close: 102.0 }
-     *   ```
-     * - **New candle (no data):**
-     *   ```
-     *   { open: 102.0, high: 105.0, low: 98.0, close: 102.0 }
-     *   ```
+     * - **No new prices:** Reuses the last candle's values to create a new one.
+     * - **Existing candle:** Moves it to the closed list, and the next interval starts with a new one.
      *
-     * @param closeTimestamp The timestamp for the candle's closure.
+     * @param closeTimestamp The timestamp marking the end of the current interval.
      */
     private fun handleCloseCandle(closeTimestamp: Instant) {
         val (closedCandles, currentCandle) = state
         if (currentCandle == null) {
-            closedCandles.lastOrNull()?.let { lastCandle ->
-                val newCandle = Candlestick(
-                    openTimestamp = lastCandle.closeTimestamp,
-                    closeTimestamp = closeTimestamp,
-                    openPrice = lastCandle.closingPrice,
-                    highPrice = lastCandle.highPrice,
-                    lowPrice = lastCandle.lowPrice,
-                    closingPrice = lastCandle.closingPrice
-                )
+            closedCandles.createFromLast()?.let { newCandle ->
                 closedCandles += newCandle
                 while (closedCandles.size > maxCandles) closedCandles.removeFirst()
             }
@@ -171,8 +159,8 @@ class CandlestickHandlerImpl(
      */
     private fun handleNewPrice(timedPrice: TimedPrice) {
         val (price, timestamp) = timedPrice
-        val priceMinuteStart = timestamp.truncatedTo(ChronoUnit.MINUTES)
-        val nextMinuteStart = priceMinuteStart.plus(1, ChronoUnit.MINUTES)
+        val priceMinuteStart = timestamp.truncatedTo(MINUTES)
+        val nextMinuteStart = priceMinuteStart.plus(1, MINUTES)
 
         state.currentCandle?.let { current ->
             when (priceMinuteStart) {
@@ -237,18 +225,41 @@ class CandlestickHandlerImpl(
     }
 
     /**
-     * Retrieves a list of candlesticks, optionally including the current candlestick
-     * if it is still open.
-     * The number of returned candlesticks is limited to `maxCandles`.
+     * Retrieves a list of the most recent candlesticks, including the current candlestick
+     * if it is still open, or a generated candlestick based on the last closed one if no
+     * new data has been received for the current interval.
      *
-     * @return A list of `Candlestick` objects representing the most recent candlesticks,
-     * including the current candlestick if applicable, each as a new copy.
+     * ### Behavior:
+     * - If a `currentCandle` exists:
+     *   - It is included in the result along with the closed candlesticks.
+     * - If no `currentCandle` exists:
+     *   - A new candlestick is generated using `createFromLast` based on the last closed candlestick,
+     *     ensuring that the list remains continuous even during periods of inactivity.
+     * - The list is limited to `maxCandles` entries, with older candlesticks removed as necessary.
+     * - All candlesticks are returned as immutable copies to ensure that the internal state remains unchanged.
+     *
+     * ### Example:
+     * - **Active interval with a current candle:**
+     *   ```
+     *   [ClosedCandle1, ClosedCandle2, CurrentCandle]
+     *   ```
+     * - **Inactive interval with no current candle:**
+     *   ```
+     *   [ClosedCandle1, ClosedCandle2, GeneratedCandleFromLast]
+     *   ```
+     *
+     * ### Performance:
+     * - Copies each candlestick to ensure immutability of the returned list.
+     * - Limits the size of the returned list to `maxCandles`, reducing memory usage for large datasets.
+     *
+     * @return A list of `Candlestick` objects representing the most recent intervals.
      */
     override fun getCandlesticks(): List<Candlestick> {
         val (closedCandles, currentCandle) = state
-        return (currentCandle?.let { closedCandles + it } ?: closedCandles)
+        val lastCandlestick = currentCandle ?: closedCandles.createFromLast()
+        return (lastCandlestick?.let { closedCandles + it } ?: closedCandles)
             .takeLast(maxCandles)
-            .map { it.copy() }
+            .map(Candlestick::copy)
             .also { log.trace { "[$isin] Returning candlesticks: $it" } }
     }
 
@@ -280,6 +291,59 @@ class CandlestickHandlerImpl(
     private suspend fun closeCurrentCandle(closeTimestamp: Instant) {
         eventChannel.send(CloseCandle(closeTimestamp))
         log.trace { "[$isin] Sent close candle event for timestamp: $closeTimestamp" }
+    }
+
+    /**
+     * Creates a new candlestick using the last closed candlestick's data.
+     *
+     * ### Behavior:
+     * - If the list is not empty:
+     *   - The new candlestick is created with:
+     *     - `openTimestamp` set to the `closeTimestamp` of the last candlestick.
+     *     - `closeTimestamp` set to 1 minute after the `closeTimestamp` of the last candlestick.
+     *     - `openPrice` and `closingPrice` set to the `closingPrice` of the last candlestick.
+     *     - `highPrice` and `lowPrice` reused from the last candlestick.
+     * - If the list is empty:
+     *   - Returns `null`, as there is no candlestick to base the new one on.
+     *
+     * ### Example:
+     * - **Last closed candlestick:**
+     *   ```
+     *   {
+     *     openTimestamp: 2023-10-10T10:00:00Z,
+     *     closeTimestamp: 2023-10-10T10:01:00Z,
+     *     openPrice: 100.0,
+     *     closingPrice: 105.0,
+     *     highPrice: 110.0,
+     *     lowPrice: 95.0
+     *   }
+     *   ```
+     * - **Generated candlestick:**
+     *   ```
+     *   {
+     *     openTimestamp: 2023-10-10T10:01:00Z,
+     *     closeTimestamp: 2023-10-10T10:02:00Z,
+     *     openPrice: 105.0,
+     *     closingPrice: 105.0,
+     *     highPrice: 110.0,
+     *     lowPrice: 95.0
+     *   }
+     *   ```
+     *
+     * @receiver A list of `Candlestick` objects, typically representing the closed candlesticks.
+     * @return A new candlestick based on the last one, or `null` if the list is empty.
+     */
+    private fun List<Candlestick>.createFromLast(): Candlestick? {
+        return lastOrNull()?.let { lastCandle ->
+            Candlestick(
+                openTimestamp = lastCandle.closeTimestamp,
+                closeTimestamp = lastCandle.closeTimestamp.plus(1, MINUTES),
+                openPrice = lastCandle.closingPrice,
+                highPrice = lastCandle.highPrice,
+                lowPrice = lastCandle.lowPrice,
+                closingPrice = lastCandle.closingPrice
+            )
+        }
     }
 
     /**

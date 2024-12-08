@@ -10,7 +10,8 @@ import io.ktor.client.*
 import io.ktor.client.plugins.websocket.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
-import java.time.Instant
+import java.time.LocalDateTime
+import java.time.ZoneOffset
 
 /**
  * WebSocket listener for real-time instrument and quote updates.
@@ -68,7 +69,7 @@ class MessageListenerImpl(
             for (event in quoteChannel) {
                 try {
                     val quote = event.data
-                    val timestamp = Instant.now()
+                    val timestamp = LocalDateTime.now().toInstant(ZoneOffset.UTC)
                     manager.getHandler(quote.isin).addPrice(TimedPrice(quote.price, timestamp))
                 } catch (e: Exception) {
                     log.error(e) { "Failed to process quote event: ${e.message}" }
