@@ -1,142 +1,245 @@
 package com.disterde.candlesticks.service
 
+import com.disterde.candlesticks.model.CandleState
 import com.disterde.candlesticks.model.Candlestick
+import com.disterde.candlesticks.model.TimedPrice
+import com.disterde.candlesticks.util.ISIN
 import com.disterde.candlesticks.util.Price
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.*
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.channels.Channel.Factory.BUFFERED
 import java.time.Duration
 import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneOffset
-import java.util.concurrent.ConcurrentLinkedQueue
-import java.util.concurrent.atomic.AtomicReference
+import java.time.temporal.ChronoUnit
 
-class CandlestickHandlerImpl : CandlestickHandler {
+/**
+ * Implementation of a candlestick handler for a specific ISIN.
+ *
+ * This class processes incoming price updates and generates candlesticks in 1-minute intervals.
+ * The most recent `maxCandles` candlesticks are retained, and excess data is discarded.
+ *
+ * ### Key Features:
+ * - Efficient handling of price updates using a `Channel` to serialize updates.
+ * - Internal state management using mutable collections for simplicity and performance.
+ * - Copying of data during retrieval to ensure external immutability.
+ *
+ * ### Scalability Considerations:
+ * While the current implementation is optimized for a small number of candlesticks (`maxCandles`),
+ * the following adjustments could be made to handle higher loads or larger data requirements:
+ *
+ * 1. **Increased `maxCandles`:**
+ *    - Replace the `MutableList` with a more scalable data structure, such as a ring buffer or `Deque`.
+ *    - Use an indexed structure (e.g., `LinkedHashMap` with `openTimestamp` as key) to optimize lookups.
+ *
+ * 2. **Handling High-Volume Updates:**
+ *    - Increase `Channel` capacity to handle bursts of incoming data.
+ *    - Use a batching mechanism to group updates before processing.
+ *
+ * 3. **Distributed State Management:**
+ *    - For horizontal scaling, shard state by ISIN and distribute processing across multiple nodes.
+ *    - Use a distributed cache (e.g., Redis) to store candlesticks for global access.
+ *
+ * 4. **Asynchronous Data Storage:**
+ *    - Persist closed candlesticks to a database or file system for long-term storage.
+ *    - Keep only the most recent `maxCandles` in memory for fast access.
+ *
+ * 5. **High-Frequency Reading Optimization:**
+ *    - If reads vastly outnumber writings,
+ *    cache the result of `getCandlesticks()` and update it only on state changes.
+ */
+class CandlestickHandlerImpl(
+    private val isin: ISIN,
+    private val maxCandles: Int,
+) : CandlestickHandler {
 
-    private val incomingPrices = ConcurrentLinkedQueue<Price>()
-
-    private val candlestickBuffer = arrayOfNulls<Candlestick>(29)
-    private var candleCount = 0
-    private var currentIndex = 0
-
-    private val candlesList = AtomicReference<List<Candlestick>>(emptyList())
-
-    private var openPrice: Price? = null
-    private var closePrice: Price? = null
-    private var minPrice: Price? = null
-    private var maxPrice: Price? = null
-
+    private val log = KotlinLogging.logger {}
     private val scope = CoroutineScope(Dispatchers.Default)
 
+    // Mutable state for storing candlesticks
+    private val state = CandleState()
+
+    // Channel for sequentially processing price updates and commands
+    private val eventChannel = Channel<PriceMessage>(
+        capacity = BUFFERED,
+        onUndeliveredElement = {
+            log.warn { "Unprocessed element dropped in the $isin handler: $it" }
+        }
+    )
+
+    // Messages for the channel
+    private sealed class PriceMessage
+    private data class NewPrice(val price: TimedPrice) : PriceMessage()
+    private data class CloseCandle(val closeTimestamp: Instant) : PriceMessage()
+
     init {
+        // Coroutine to close the current candle at the end of each minute
         scope.launch {
-            var currentMinute = LocalDateTime.now().withSecond(0).withNano(0)
-
+            var currentMinuteStart = LocalDateTime.now().withSecond(0).withNano(0)
             while (isActive) {
-                val now = LocalDateTime.now()
-                val nextMinute = now.withSecond(0).withNano(0).plusMinutes(1)
-                val delayMs = Duration.between(now, nextMinute).toMillis()
+                val nextMinuteStart = currentMinuteStart.plusMinutes(1)
+                val delayMs = Duration.between(LocalDateTime.now(), nextMinuteStart).toMillis()
                 delay(delayMs.coerceAtLeast(0))
+                closeCurrentCandle(nextMinuteStart.toInstant(ZoneOffset.UTC))
+                currentMinuteStart = nextMinuteStart
+            }
+        }
 
-                fillPrices()
+        // Coroutine to process events from the channel
+        scope.launch {
+            for (event in eventChannel) {
+                handleEvent(event)
+            }
+        }
+    }
 
-                val openT = currentMinute.toInstant(ZoneOffset.UTC)
-                val closeT = currentMinute.plusMinutes(1).toInstant(ZoneOffset.UTC)
-                val lastCandle = candlesList.get().lastOrNull()
-                val newCandle = createCandle(openT, closeT, lastCandle)
+    /**
+     * Processes incoming events.
+     */
+    private fun handleEvent(event: PriceMessage) {
+        when (event) {
+            is NewPrice -> {
+                log.trace { "Processing new price event: $event" }
+                handleNewPrice(event.price)
+            }
 
-                newCandle?.let { candle ->
-                    candlestickBuffer[currentIndex] = candle
-                    if (candleCount < BUFFER_SIZE) {
-                        candleCount++
+            is CloseCandle -> {
+                log.trace { "Processing close candle event: $event" }
+                handleCloseCandle(event.closeTimestamp)
+            }
+        }
+    }
+
+    /**
+     * Handles the closure of the current candle and moves it to the list of closed candles.
+     */
+    private fun handleCloseCandle(closeTimestamp: Instant) {
+        val (closedCandles, currentCandle) = state
+        if (currentCandle == null) {
+            closedCandles.lastOrNull()?.let {
+                val newCandle = it.copy(
+                    openTimestamp = it.closeTimestamp,
+                    closeTimestamp = closeTimestamp,
+                )
+                closedCandles += newCandle
+                while (closedCandles.size > maxCandles) closedCandles.removeFirst()
+            }
+        } else if (currentCandle.closeTimestamp == closeTimestamp) {
+            closedCandles += currentCandle
+            while (closedCandles.size > maxCandles) closedCandles.removeFirst()
+            state.currentCandle = null
+        }
+        log.info { "Closed candle at $closeTimestamp" }
+    }
+
+    /**
+     * Handles a new incoming price by updating the current or closed candles.
+     */
+    private fun handleNewPrice(timedPrice: TimedPrice) {
+        val (price, timestamp) = timedPrice
+        val priceMinuteStart = timestamp.truncatedTo(ChronoUnit.MINUTES)
+        val nextMinuteStart = priceMinuteStart.plus(1, ChronoUnit.MINUTES)
+
+        state.currentCandle?.let { current ->
+            when (priceMinuteStart) {
+                current.openTimestamp -> {
+                    current.apply {
+                        closingPrice = price
+                        highPrice = maxOf(highPrice, price)
+                        lowPrice = minOf(lowPrice, price)
                     }
-                    currentIndex = (currentIndex + 1) % BUFFER_SIZE
-
-                    val recentCandles = buildList {
-                        val start = if (candleCount == BUFFER_SIZE) currentIndex else 0
-                        for (i in 0..<candleCount) {
-                            val idx = (start + i) % BUFFER_SIZE
-                            val c = candlestickBuffer[idx]!!
-                            add(c)
-                        }
-                    }
-                    candlesList.set(recentCandles)
+                    log.debug { "Updated current candle with price: $price at $timestamp" }
                 }
 
-                openPrice = null
-                closePrice = null
-                minPrice = null
-                maxPrice = null
+                current.closeTimestamp -> {
+                    val newCandle = createCandle(priceMinuteStart, nextMinuteStart, price)
+                    state.closedCandles += current
+                    while (state.closedCandles.size > maxCandles) state.closedCandles.removeFirst()
+                    state.currentCandle = newCandle
+                    log.info { "Closed current candle and created new one for $priceMinuteStart" }
+                }
 
-                currentMinute = nextMinute
+                else -> updateClosedCandles(price, priceMinuteStart)
             }
+        } ?: run {
+            state.currentCandle = createCandle(priceMinuteStart, nextMinuteStart, price)
+            log.info { "Created new candle for $priceMinuteStart with price: $price" }
         }
     }
 
-    private fun createCandle(openT: Instant, closeT: Instant, prevCandle: Candlestick?): Candlestick? {
-        return if (openPrice == null) {
-            prevCandle?.copy(
-                openTimestamp = openT,
-                closeTimestamp = closeT
-            )
+    /**
+     * Updates a closed candle if the price corresponds to an already closed minute.
+     */
+    private fun updateClosedCandles(price: Price, priceMinuteStart: Instant) {
+        val closedCandles = state.closedCandles
+        val index = closedCandles.indexOfLast { it.openTimestamp == priceMinuteStart }
+        if (index != -1) {
+            closedCandles[index].apply {
+                closingPrice = price
+                highPrice = maxOf(highPrice, price)
+                lowPrice = minOf(lowPrice, price)
+            }
+            log.debug { "Updated closed candle for $priceMinuteStart with price: $price" }
         } else {
-            Candlestick(
-                openTimestamp = openT,
-                closeTimestamp = closeT,
-                openPrice = openPrice!!,
-                highPrice = maxPrice!!,
-                lowPrice = minPrice!!,
-                closingPrice = closePrice!!
-            )
+            log.warn { "Price received for unknown candle: $priceMinuteStart" }
         }
     }
 
-    private fun fillPrices() {
-        var p = incomingPrices.poll()
-        while (p != null) {
-            if (openPrice == null) {
-                openPrice = p
-                closePrice = p
-                minPrice = p
-                maxPrice = p
-            } else {
-                closePrice = p
-                if (p < minPrice!!) minPrice = p
-                if (p > maxPrice!!) maxPrice = p
-            }
-            p = incomingPrices.poll()
-        }
+    /**
+     * Adds a new price to the handler.
+     */
+    override suspend fun addPrice(price: TimedPrice) {
+        eventChannel.send(NewPrice(price))
+        log.trace { "Added price to event channel: $price" }
     }
 
-    override fun addPrice(price: Price) {
-        incomingPrices.offer(price)
-    }
-
+    /**
+     * Returns the list of candlesticks, including the current one if it exists.
+     *
+     * Copies are returned to prevent external consumers from mutating internal state.
+     */
     override fun getCandlesticks(): List<Candlestick> {
-        val closed = candlesList.get()
-
-        val now = LocalDateTime.now().withSecond(0).withNano(0)
-        val openT = now.toInstant(ZoneOffset.UTC)
-        val closeT = now.plusMinutes(1).toInstant(ZoneOffset.UTC)
-        val lastCandle = closed.lastOrNull()
-
-        val current = createCandle(openT, closeT, lastCandle)
-
-        return if (current != null) {
-            ArrayList<Candlestick>(closed.size + 1).apply {
-                addAll(closed)
-                add(current)
-            }
-        } else {
-            closed
-        }
+        val (closedCandles, currentCandle) = state
+        return (currentCandle?.let { closedCandles + it } ?: closedCandles)
+            .takeLast(maxCandles)
+            .map { it.copy() }
+            .also { log.trace { "Returning candlesticks: $it" } }
     }
 
+    /**
+     * Stops the handler and cleans up resources.
+     */
     override fun stop() {
         scope.cancel()
+        eventChannel.close()
+        log.info { "Stopped handler for ISIN: $isin" }
     }
 
-    companion object {
-        private const val BUFFER_SIZE = 29
+    /**
+     * Sends a command to close the current candle.
+     */
+    private suspend fun closeCurrentCandle(closeTimestamp: Instant) {
+        eventChannel.send(CloseCandle(closeTimestamp))
+        log.trace { "Sent close candle event for timestamp: $closeTimestamp" }
+    }
+
+    /**
+     * Creates a new candlestick.
+     */
+    private fun createCandle(
+        openT: Instant,
+        closeT: Instant,
+        price: Price
+    ) = Candlestick(
+        openTimestamp = openT,
+        closeTimestamp = closeT,
+        openPrice = price,
+        closingPrice = price,
+        highPrice = price,
+        lowPrice = price
+    ).also {
+        log.trace { "New candle created: $it" }
     }
 }
