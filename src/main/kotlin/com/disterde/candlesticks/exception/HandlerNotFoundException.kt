@@ -19,8 +19,8 @@ package com.disterde.candlesticks.exception
  * throw HandlerNotFoundException("US0378331005")
  * ```
  *
- * The error message will be: "No handler found for the specified ISIN. ISIN: US0378331005"
+ * The error message will be: "Handler not found for the specified ISIN: US0378331005"
  */
 class HandlerNotFoundException(isin: String) : ApiException(
-    "No handler found for the specified ISIN. ISIN: $isin"
+    "Handler not found for the specified ISIN: $isin"
 )
