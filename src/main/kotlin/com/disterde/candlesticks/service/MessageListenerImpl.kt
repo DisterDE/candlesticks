@@ -172,7 +172,8 @@ class MessageListenerImpl(
     }
 
     companion object {
-        private const val HOST = "localhost"
+        //        private const val HOST = "localhost" // local hostname
+        private const val HOST = "partner-service" // Docker hostname
         private const val PORT = 8032
         private const val QUOTES = "/quotes"
         private const val INSTRUMENTS = "/instruments"

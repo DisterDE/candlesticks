@@ -38,7 +38,7 @@ class MessageListenerImplTest {
 
     @BeforeEach
     fun init() {
-        listener = MessageListenerImpl(client, manager, port = PORT)
+        listener = MessageListenerImpl(client, manager, HOST, PORT)
     }
 
     @Test
@@ -159,6 +159,7 @@ class MessageListenerImplTest {
     private inline fun <reified T : Any> T.toJson(): String = Json.encodeToString(this)
 
     companion object {
+        private const val HOST = "localhost"
         private const val PORT = 8080
         private const val ISIN = "TEST_ISIN"
         private const val PRICE = 1.0
