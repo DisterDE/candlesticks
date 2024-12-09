@@ -10,7 +10,7 @@ Ensure Docker is installed on your system to run the service.
 
 ## Installation Instructions
 
-1. **Run the Docker Compose setup:**
+**Run the Docker Compose setup:**
 
    ```bash
    docker-compose up
