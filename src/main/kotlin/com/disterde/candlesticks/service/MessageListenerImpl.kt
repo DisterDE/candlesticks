@@ -51,8 +51,8 @@ class MessageListenerImpl(
     private var active = true
 
     // Channels for quote and instrument processing
-    private val quoteChannel = Channel<QuoteEvent>(Channel.UNLIMITED)
-    private val instrumentChannel = Channel<InstrumentEvent>(Channel.UNLIMITED)
+    private val quoteChannel = Channel<QuoteEvent>(Channel.BUFFERED)
+    private val instrumentChannel = Channel<InstrumentEvent>(Channel.BUFFERED)
 
     /**
      * Starts the WebSocket listener and initializes processing channels.
