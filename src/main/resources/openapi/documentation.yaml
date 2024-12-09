@@ -1,4 +1,4 @@
-openapi: 3.0.1
+openapi: 3.1.0
 info:
   title: Candlestick Service API
   description: API for retrieving candlestick data for financial instruments.
@@ -8,65 +8,53 @@ info:
   version: "1.0"
 servers:
   - url: http://localhost:9000
+tags:
+  - name: "candlesticks"
+    description: "Candlesticks endpoints"
 paths:
   /candlesticks:
     get:
-      summary: Retrieve candlestick data for a financial instrument
+      tags:
+        - candlesticks
+      summary: Retrieve candlestick data
       description: >
-        Retrieves a list of candlestick data for the specified financial instrument,
-        identified by its ISIN.
+        Retrieve candlestick data for a specific ISIN. 
+        Requires the `isin` query parameter to specify the financial instrument.
       parameters:
         - name: isin
           in: query
-          description: The ISIN of the instrument to retrieve candlestick data for.
           required: true
+          description: ISIN (International Securities Identification Number) of the instrument.
           schema:
             type: string
+            example: "US0378331005"
       responses:
-        "200":
-          description: Successfully retrieved candlestick data.
+        '200':
+          description: A list of candlestick data.
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: "#/components/schemas/Candlestick"
-        "400":
-          description: Missing ISIN parameter in the request.
+                  $ref: '#/components/schemas/Candlestick'
+        '400':
+          description: Bad request, missing or invalid ISIN.
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  reason:
-                    type: string
-                  example:
-                    reason: missing_isin
-        "404":
-          description: Handler for the specified ISIN was not found.
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Handler not found for the given ISIN.
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  reason:
-                    type: string
-                  isin:
-                    type: string
-                example:
-                  reason: handler_not_found
-                  isin: TEST_ISIN
-        "500":
-          description: An internal error occurred while retrieving the candlestick data.
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error.
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  reason:
-                    type: string
-                example:
-                  reason: internal_server_error
+                $ref: '#/components/schemas/Error'
 components:
   schemas:
     Candlestick:
@@ -75,24 +63,42 @@ components:
         openTimestamp:
           type: string
           format: date-time
-          description: The timestamp when the candlestick started.
+          description: Start time of the candlestick.
+          example: "2023-10-10T10:00:00Z"
         closeTimestamp:
           type: string
           format: date-time
-          description: The timestamp when the candlestick ended.
+          description: End time of the candlestick.
+          example: "2023-10-10T10:01:00Z"
         openPrice:
           type: number
           format: double
-          description: The price at the start of the interval.
+          description: Opening price of the interval.
+          example: 100.5
         closingPrice:
           type: number
           format: double
-          description: The price at the end of the interval.
+          description: Closing price of the interval.
+          example: 101.0
         highPrice:
           type: number
           format: double
-          description: The highest price during the interval.
+          description: Highest price within the interval.
+          example: 102.0
         lowPrice:
           type: number
           format: double
-          description: The lowest price during the interval.
+          description: Lowest price within the interval.
+          example: 99.5
+    Error:
+      type: object
+      properties:
+        reason:
+          type: string
+          description: Error reason or code.
+          example: "handler_not_found"
+        isin:
+          type: string
+          nullable: true
+          description: The ISIN related to the error, if applicable.
+          example: "US0378331005"
