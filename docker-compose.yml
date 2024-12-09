@@ -15,5 +15,7 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: candlesticks-app
+    environment:
+      - TZ=Europe/Berlin
     ports:
       - "9000:9000"
