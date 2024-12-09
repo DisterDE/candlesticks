@@ -138,7 +138,7 @@ class CandlestickHandlerImplTest {
             }
         }
 
-        advanceTimeBy(100.seconds)
+        advanceTimeBy(60.seconds)
         handler.stop()
 
         val candles = handler.getCandlesticks()

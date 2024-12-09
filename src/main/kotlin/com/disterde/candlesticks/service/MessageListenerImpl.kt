@@ -39,7 +39,9 @@ import java.time.ZoneOffset
  */
 class MessageListenerImpl(
     private val client: HttpClient,
-    private val manager: HandlerManager
+    private val manager: HandlerManager,
+    private val host: String = HOST,
+    private val port: Int = PORT
 ) : MessageListener {
 
     private val log = KotlinLogging.logger {}
@@ -128,7 +130,7 @@ class MessageListenerImpl(
         scope.launch {
             while (active) {
                 try {
-                    client.webSocket(host = HOST, port = PORT, path = path) {
+                    client.webSocket(host = host, port = port, path = path) {
                         log.info { "Connected to $name WebSocket at $HOST:$PORT$path" }
                         while (active) {
                             val event = receiveDeserialized<T>()
