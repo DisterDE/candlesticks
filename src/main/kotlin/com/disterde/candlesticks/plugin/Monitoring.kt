@@ -29,7 +29,7 @@ import org.slf4j.event.Level
 fun Application.configureMonitoring() {
     install(CallLogging) {
         // Sets the logging level to INFO
-        level = Level.DEBUG
+        level = Level.INFO
 
         // Filters the requests to be logged (e.g., log only paths starting with '/')
         filter { call ->
