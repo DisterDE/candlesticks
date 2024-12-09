@@ -1,0 +1,98 @@
+openapi: 3.0.1
+info:
+  title: Candlestick Service API
+  description: API for retrieving candlestick data for financial instruments.
+  contact:
+    name: "Kirill Kachalov"
+    url: "https://github.com/DisterDE"
+  version: "1.0"
+servers:
+  - url: http://localhost:9000
+paths:
+  /candlesticks:
+    get:
+      summary: Retrieve candlestick data for a financial instrument
+      description: >
+        Retrieves a list of candlestick data for the specified financial instrument,
+        identified by its ISIN.
+      parameters:
+        - name: isin
+          in: query
+          description: The ISIN of the instrument to retrieve candlestick data for.
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Successfully retrieved candlestick data.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Candlestick"
+        "400":
+          description: Missing ISIN parameter in the request.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  reason:
+                    type: string
+                  example:
+                    reason: missing_isin
+        "404":
+          description: Handler for the specified ISIN was not found.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  reason:
+                    type: string
+                  isin:
+                    type: string
+                example:
+                  reason: handler_not_found
+                  isin: TEST_ISIN
+        "500":
+          description: An internal error occurred while retrieving the candlestick data.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  reason:
+                    type: string
+                example:
+                  reason: internal_server_error
+components:
+  schemas:
+    Candlestick:
+      type: object
+      properties:
+        openTimestamp:
+          type: string
+          format: date-time
+          description: The timestamp when the candlestick started.
+        closeTimestamp:
+          type: string
+          format: date-time
+          description: The timestamp when the candlestick ended.
+        openPrice:
+          type: number
+          format: double
+          description: The price at the start of the interval.
+        closingPrice:
+          type: number
+          format: double
+          description: The price at the end of the interval.
+        highPrice:
+          type: number
+          format: double
+          description: The highest price during the interval.
+        lowPrice:
+          type: number
+          format: double
+          description: The lowest price during the interval.

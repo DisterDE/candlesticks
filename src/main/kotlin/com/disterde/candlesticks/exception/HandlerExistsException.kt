@@ -21,6 +21,6 @@ package com.disterde.candlesticks.exception
  *
  * The error message will be: "Handler already exists for the specified ISIN: US0378331005"
  */
-class HandlerExistsException(isin: String) : ApiException(
+class HandlerExistsException(val isin: String) : ApiException(
     "Handler already exists for the specified ISIN: $isin"
 )

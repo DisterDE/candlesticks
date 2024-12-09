@@ -1,5 +1,6 @@
 package com.disterde.candlesticks.plugin
 
+import com.disterde.candlesticks.exception.ApiException
 import com.disterde.candlesticks.exception.HandlerNotFoundException
 import com.disterde.candlesticks.service.HandlerManager
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -7,6 +8,8 @@ import io.ktor.http.HttpStatusCode.Companion.BadRequest
 import io.ktor.http.HttpStatusCode.Companion.InternalServerError
 import io.ktor.http.HttpStatusCode.Companion.NotFound
 import io.ktor.server.application.*
+import io.ktor.server.plugins.statuspages.*
+import io.ktor.server.plugins.swagger.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import org.koin.ktor.ext.inject
@@ -30,30 +33,33 @@ import org.koin.ktor.ext.inject
  */
 fun Application.configureRouting() {
     val log = KotlinLogging.logger {}
-    val orchestrator by inject<HandlerManager>()
+    val manager by inject<HandlerManager>()
 
     routing {
-        /**
-         * GET /candlesticks
-         * Retrieves the candlestick data for a specified ISIN.
-         */
         get("/candlesticks") {
             call.request.queryParameters["isin"]?.let { isin ->
-                try {
-                    val handler = orchestrator.getHandler(isin)
-                    val candlesticks = handler.getCandlesticks()
-                    call.respond(candlesticks)
-                } catch (e: HandlerNotFoundException) {
-                    log.error(e) { "Handler not found for ISIN: $isin" }
-                    call.respond(NotFound, mapOf("reason" to "handler_not_found", "isin" to isin))
-                } catch (e: Exception) {
-                    log.error(e) { "Failed to retrieve candlesticks for ISIN: $isin" }
-                    call.respond(InternalServerError, mapOf("reason" to "internal_server_error"))
-                }
+                val handler = manager.getHandler(isin)
+                val candlesticks = handler.getCandlesticks()
+                call.respond(candlesticks)
             } ?: run {
                 log.warn { "Missing ISIN parameter in request" }
                 call.respond(BadRequest, mapOf("reason" to "missing_isin"))
             }
         }
+    }
+
+    install(StatusPages) {
+        exception<HandlerNotFoundException> { call, cause ->
+            log.error(cause) { "Handler not found for ISIN: ${cause.isin}" }
+            call.respond(NotFound, mapOf("reason" to "handler_not_found", "isin" to cause.isin))
+        }
+        exception<ApiException> { call, cause ->
+            log.error(cause) { "Failed to retrieve candlesticks" }
+            call.respond(InternalServerError, mapOf("reason" to "internal_server_error"))
+        }
+    }
+
+    routing {
+        swaggerUI(path = "swagger")
     }
 }

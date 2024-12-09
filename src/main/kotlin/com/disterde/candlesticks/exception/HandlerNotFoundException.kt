@@ -21,6 +21,6 @@ package com.disterde.candlesticks.exception
  *
  * The error message will be: "Handler not found for the specified ISIN: US0378331005"
  */
-class HandlerNotFoundException(isin: String) : ApiException(
+class HandlerNotFoundException(val isin: String) : ApiException(
     "Handler not found for the specified ISIN: $isin"
 )
