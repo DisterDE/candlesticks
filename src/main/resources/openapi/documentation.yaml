@@ -1,36 +1,34 @@
 openapi: 3.1.0
 info:
-  title: Candlestick Service API
-  description: API for retrieving candlestick data for financial instruments.
+  title: "Candlestick API"
+  description: "API for managing candlesticks for financial instruments."
+  version: "1.0.0"
   contact:
     name: "Kirill Kachalov"
     url: "https://github.com/DisterDE"
-  version: "1.0"
 servers:
-  - url: http://localhost:9000
+  - url: "http://localhost:8080"
+    description: "Local development server"
 tags:
-  - name: "candlesticks"
-    description: "Candlesticks endpoints"
+  - name: "Candlesticks"
+    description: "Endpoints for working with candlesticks"
 paths:
   /candlesticks:
     get:
+      summary: "Retrieve candlesticks for a specific ISIN"
+      description: "Returns a list of candlesticks for a given financial instrument identified by ISIN."
       tags:
-        - candlesticks
-      summary: Retrieve candlestick data
-      description: >
-        Retrieve candlestick data for a specific ISIN. 
-        Requires the `isin` query parameter to specify the financial instrument.
+        - "Candlesticks"
       parameters:
-        - name: isin
-          in: query
+        - in: query
+          name: isin
           required: true
-          description: ISIN (International Securities Identification Number) of the instrument.
+          description: "The ISIN of the financial instrument."
           schema:
             type: string
-            example: "US0378331005"
       responses:
         '200':
-          description: A list of candlestick data.
+          description: "A list of candlesticks."
           content:
             application/json:
               schema:
@@ -38,23 +36,11 @@ paths:
                 items:
                   $ref: '#/components/schemas/Candlestick'
         '400':
-          description: Bad request, missing or invalid ISIN.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
+          $ref: '#/components/responses/MissingISIN'
         '404':
-          description: Handler not found for the given ISIN.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
+          $ref: '#/components/responses/HandlerNotFound'
         '500':
-          description: Internal server error.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
+          $ref: '#/components/responses/ApiException'
 components:
   schemas:
     Candlestick:
@@ -63,42 +49,47 @@ components:
         openTimestamp:
           type: string
           format: date-time
-          description: Start time of the candlestick.
-          example: "2023-10-10T10:00:00Z"
+          description: "The opening time of the candlestick."
         closeTimestamp:
           type: string
           format: date-time
-          description: End time of the candlestick.
-          example: "2023-10-10T10:01:00Z"
+          description: "The closing time of the candlestick."
         openPrice:
           type: number
-          format: double
-          description: Opening price of the interval.
-          example: 100.5
+          description: "The opening price of the candlestick."
         closingPrice:
           type: number
-          format: double
-          description: Closing price of the interval.
-          example: 101.0
+          description: "The closing price of the candlestick."
         highPrice:
           type: number
-          format: double
-          description: Highest price within the interval.
-          example: 102.0
+          description: "The highest price during the candlestick's interval."
         lowPrice:
           type: number
-          format: double
-          description: Lowest price within the interval.
-          example: 99.5
-    Error:
-      type: object
-      properties:
-        reason:
-          type: string
-          description: Error reason or code.
-          example: "handler_not_found"
-        isin:
-          type: string
-          nullable: true
-          description: The ISIN related to the error, if applicable.
-          example: "US0378331005"
+          description: "The lowest price during the candlestick's interval."
+      required:
+        - openTimestamp
+        - closeTimestamp
+        - openPrice
+        - closingPrice
+        - highPrice
+        - lowPrice
+  responses:
+    MissingISIN:
+      description: "The request is missing the required ISIN parameter."
+      content:
+        application/json:
+          example:
+            reason: "missing_isin"
+    HandlerNotFound:
+      description: "The handler for the specified ISIN was not found."
+      content:
+        application/json:
+          example:
+            reason: "handler_not_found"
+            isin: "TEST_ISIN"
+    ApiException:
+      description: "A server-side error occurred."
+      content:
+        application/json:
+          example:
+            reason: "internal_server_error"
