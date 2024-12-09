@@ -5,10 +5,10 @@ import com.disterde.candlesticks.plugin.configureMonitoring
 import com.disterde.candlesticks.plugin.configureRouting
 import com.disterde.candlesticks.plugin.configureSerialization
 import com.disterde.candlesticks.service.MessageListener
+import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.server.application.*
 import io.ktor.server.cio.*
 import io.ktor.server.engine.*
-import io.github.oshai.kotlinlogging.KotlinLogging
 import org.koin.ktor.ext.inject
 
 private val log = KotlinLogging.logger {}
@@ -26,7 +26,6 @@ fun main() {
     embeddedServer(
         CIO,
         port = 9000,
-        host = "0.0.0.0",
         module = Application::module
     ).start(wait = true)
 }
