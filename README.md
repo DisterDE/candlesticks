@@ -121,7 +121,7 @@ This version does not implement authorization as the primary focus is on real-ti
 
 2. **Simplified State Management**:
 
-- All state is localized within individual handlers to reduce shared resource contention.
+- All states are localized within individual handlers to reduce shared resource contention.
 
 3. **Error Handling**:
 
