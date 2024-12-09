@@ -12,7 +12,7 @@ import org.slf4j.event.Level
  * ### Features:
  * - Logs information about incoming requests, such as paths and methods.
  * - Filters requests based on their path to avoid unnecessary logging.
- * - Sets the logging level to `INFO` for standard requests.
+ * - Sets the logging level to `DEBUG` for standard requests.
  *
  * ### Configuration:
  * - Uses the `CallLogging` plugin to intercept and log HTTP requests.
@@ -28,8 +28,8 @@ import org.slf4j.event.Level
  */
 fun Application.configureMonitoring() {
     install(CallLogging) {
-        // Sets the logging level to INFO
-        level = Level.INFO
+        // Sets the logging level to DEBUG
+        level = Level.DEBUG
 
         // Filters the requests to be logged (e.g., log only paths starting with '/')
         filter { call ->
