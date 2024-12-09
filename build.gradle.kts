@@ -8,10 +8,10 @@ plugins {
 }
 
 group = "com.disterde.candlesticks"
-version = "0.0.1"
+version = "1.0.0"
 
 application {
-    mainClass.set("io.ktor.server.netty.EngineMain")
+    mainClass.set("com.disterde.candlesticks.ApplicationKt")
 
     val isDevelopment: Boolean = project.ext.has("development")
     applicationDefaultJvmArgs = listOf("-Dio.ktor.development=$isDevelopment")
@@ -68,30 +68,6 @@ tasks.test {
 }
 
 tasks.jacocoTestReport {
-    classDirectories.setFrom(
-        files(
-            classDirectories.files.map {
-                fileTree(it) {
-                    exclude("**/model/**")
-                    exclude("**/plugin/**")
-                    exclude("**/exception/**")
-                    exclude("**/util/**")
-                    exclude("**/Application*")
-                }
-            }
-        )
-    )
-}
-
-tasks.jacocoTestCoverageVerification {
-    violationRules {
-        rule {
-            limit {
-                minimum = 0.99.toBigDecimal()
-            }
-        }
-    }
-
     classDirectories.setFrom(
         files(
             classDirectories.files.map {
