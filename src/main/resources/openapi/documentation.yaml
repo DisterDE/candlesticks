@@ -7,7 +7,7 @@ info:
     name: "Kirill Kachalov"
     url: "https://github.com/DisterDE"
 servers:
-  - url: "http://localhost:8080"
+  - url: "http://localhost:9000"
     description: "Local development server"
 tags:
   - name: "Candlesticks"
