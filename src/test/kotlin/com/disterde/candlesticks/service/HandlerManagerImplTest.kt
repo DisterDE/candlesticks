@@ -4,14 +4,14 @@ import com.disterde.candlesticks.exception.HandlerExistsException
 import com.disterde.candlesticks.exception.HandlerNotFoundException
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
-import org.junit.jupiter.api.BeforeEach
-import org.junit.jupiter.api.Test
+import kotlin.test.BeforeTest
+import kotlin.test.Test
 
 class HandlerManagerImplTest {
 
     private lateinit var manager: HandlerManagerImpl
 
-    @BeforeEach
+    @BeforeTest
     fun setUp() {
         manager = HandlerManagerImpl()
     }

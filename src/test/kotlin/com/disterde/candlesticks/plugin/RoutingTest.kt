@@ -16,11 +16,11 @@ import io.mockk.mockk
 import io.mockk.verifyOrder
 import kotlinx.serialization.json.Json
 import org.assertj.core.api.Assertions.assertThat
-import org.junit.jupiter.api.Test
 import org.koin.dsl.module
 import org.koin.ktor.plugin.Koin
 import java.time.Instant
 import java.time.temporal.ChronoUnit.MINUTES
+import kotlin.test.Test
 
 class RoutingTest {
 

@@ -21,8 +21,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
-import org.junit.jupiter.api.BeforeEach
-import org.junit.jupiter.api.Test
+import kotlin.test.BeforeTest
+import kotlin.test.Test
 
 class MessageListenerImplTest {
     private val client = HttpClient {
@@ -36,8 +36,8 @@ class MessageListenerImplTest {
     private val manager = mockk<HandlerManager>(relaxed = true)
     private lateinit var listener: MessageListenerImpl
 
-    @BeforeEach
-    fun init() {
+    @BeforeTest
+    fun setUp() {
         listener = MessageListenerImpl(client, manager, HOST, PORT)
     }
 

@@ -6,12 +6,12 @@ import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runTest
 import org.assertj.core.api.Assertions.assertThat
-import org.junit.jupiter.api.BeforeEach
-import org.junit.jupiter.api.Test
 import java.time.LocalDateTime
 import java.time.ZoneOffset.UTC
 import java.time.temporal.ChronoUnit.MINUTES
 import java.time.temporal.ChronoUnit.SECONDS
+import kotlin.test.BeforeTest
+import kotlin.test.Test
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 
@@ -21,7 +21,7 @@ class CandlestickHandlerImplTest {
     private val dispatcher = StandardTestDispatcher()
     private lateinit var handler: CandlestickHandlerImpl
 
-    @BeforeEach
+    @BeforeTest
     fun setUp() {
         handler = CandlestickHandlerImpl(ISIN, MAX_CANDLES, dispatcher)
     }
