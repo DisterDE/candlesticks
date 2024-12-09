@@ -1,10 +1,10 @@
-version: "2.4"
 services:
   partner-service:
     image: openjdk:17
     volumes:
       - ./:/app
     command: bash -c "cd /app && java -jar partner-service-1.0.1-all.jar --port=8032"
+    container_name: partner-service-app
     ports:
       - "8032:8032"
 
